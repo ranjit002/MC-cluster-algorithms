@@ -2,7 +2,6 @@ import random
 from collections import deque
 
 import numpy as np
-
 from stat_mech_library.disks import contracted_sets
 
 
@@ -206,117 +205,117 @@ rather tham manually visiting each lattice site using a for loop.
 
 However, the code turned out to be much slower than the above implementation.
 Below I left my code for this alternative implementation.
+"""
 
 from scipy.ndimage import label as cluster
 
-def order_indices(cluster_mat, offset = 0): 
 
+def order_indices(cluster_mat, offset=0):
+    """ "
     Given a matrix (cluster_mat) with each cluster indexed with an integer (e.g. 1, 2, 4, 6),
     return a matrix with the clusters indexed by integers in increasing order (1, 2, 3, 4)
-
-    #Keys contains all the cluster indices present in the cluster_mat
+    """
+    # Keys contains all the cluster indices present in the cluster_mat
     keys = np.unique(cluster_mat)
-    #The wanted indices are just integers in increasing order 
+    # The wanted indices are just integers in increasing order
     values = np.arange(len(keys))
 
-    #Every integer except for 0 is augmented by "offset"
+    # Every integer except for 0 is augmented by "offset"
     if offset != 0:
         values = [value + offset for value in values]
         values[0] = 0
 
-    #Form a mapping that maps the keys to the values
-    mapping = np.zeros(keys.max() + 1, dtype = int)
+    # Form a mapping that maps the keys to the values
+    mapping = np.zeros(keys.max() + 1, dtype=int)
     mapping[keys] = values
 
-    #Change all cluster indices to the new reordered indices
+    # Change all cluster indices to the new reordered indices
     return mapping[cluster_mat]
 
 
 def find_clusters_periodic(mat):
-
+    """
     Subdivide matrix(mat) into clusters (Complicated by the fact that scipy.ndimage.label() doesn't support periodic boundary conditions)
     The scipy function can only find clusters in a matrix with 0s and 1s (where the 0s are ignored), so the function first finds the clusters of +1,
     then the clusters of -1.
+    """
+    n = len(mat)
 
-    N = len(mat)
+    # Finding all the clusters of spin downs
+    bool_mat = mat == -1
+    flip_mat_1 = cluster(bool_mat * 1)[0]
 
-    #Finding all the clusters of spin downs
-    bool_mat = (mat == -1)
-    flip_mat_1 = cluster(bool_mat*1)[0]
-
-    #At the vertical boundaries wherever there are two clusters they need to be made "equivalent"
-    #So that the periodic boundary conditions are met.
+    # At the vertical boundaries wherever there are two clusters they need to be made "equivalent"
+    # So that the periodic boundary conditions are met.
     vertical_boundary = np.logical_and(bool_mat[0], bool_mat[-1])
-    for i in range(N):
+    for i in range(n):
         if vertical_boundary[i]:
-            indices = (flip_mat_1[0,i], flip_mat_1[-1,i])
+            indices = (flip_mat_1[0, i], flip_mat_1[-1, i])
 
-            #Replace every instance of the larger cluster index with the smaller cluster index
+            # Replace every instance of the larger cluster index with the smaller cluster index
             min_index = min(indices)
             max_index = max(indices)
             flip_mat_1 = np.where(flip_mat_1 == max_index, min_index, flip_mat_1)
 
-    #Do the same with the horizontal boundary
-    horizontal_boundary = np.logical_and(bool_mat[:, 0], bool_mat[:,-1])
-    for i in range(N):
+    # Do the same with the horizontal boundary
+    horizontal_boundary = np.logical_and(bool_mat[:, 0], bool_mat[:, -1])
+    for i in range(n):
         if horizontal_boundary[i]:
             indices = (flip_mat_1[i, 0], flip_mat_1[i, -1])
-            
+
             min_index = min(indices)
             max_index = max(indices)
             flip_mat_1 = np.where(flip_mat_1 == max_index, min_index, flip_mat_1)
-    #Reorder the indices so that they are in increasing order
+    # Reorder the indices so that they are in increasing order
     flip_mat_1 = order_indices(flip_mat_1)
 
+    # Finding all the clusters of spin ups
+    bool_mat = mat == 1
+    flip_mat_2 = cluster(bool_mat * 1)[0]
 
-
-    #Finding all the clusters of spin ups
-    bool_mat = (mat == 1)
-    flip_mat_2 = cluster(bool_mat*1)[0]
-
-    #Do the same procedure as for the spin downs
+    # Do the same procedure as for the spin downs
     vertical_boundary = np.logical_and(bool_mat[0], bool_mat[-1])
-    for i in range(N):
+    for i in range(n):
         if vertical_boundary[i]:
-            indices = (flip_mat_2[0,i], flip_mat_2[-1,i])
+            indices = (flip_mat_2[0, i], flip_mat_2[-1, i])
 
             min_index = min(indices)
             max_index = max(indices)
             flip_mat_2 = np.where(flip_mat_2 == max_index, min_index, flip_mat_2)
-    
-    horizontal_boundary = np.logical_and(bool_mat[:, 0], bool_mat[:,-1])
-    for i in range(N):
+
+    horizontal_boundary = np.logical_and(bool_mat[:, 0], bool_mat[:, -1])
+    for i in range(n):
         if horizontal_boundary[i]:
             indices = (flip_mat_2[i, 0], flip_mat_2[i, -1])
-            
+
             min_index = min(indices)
             max_index = max(indices)
             flip_mat_2 = np.where(flip_mat_2 == max_index, min_index, flip_mat_2)
-    #Add an offset to the indices of the spin up clusters, so that they don't "clash" with the indices of the spin down clusters.
+    # Add an offset to the indices of the spin up clusters, so that they don't "clash" with the indices of the spin down clusters.
     flip_mat_2 = order_indices(flip_mat_2, np.amax(flip_mat_1))
 
     return flip_mat_1 + flip_mat_2
 
-def SW_move(state, j):
 
+def sw_move(state, j):
+    """
     Perform a single Swendsen-Wang cluster update with specified seed on the state
-
-    N = len(state)
+    """
+    n = len(state)
     flip_prob = max(0, 1 - np.exp(-2 * j))
 
-    #Probabilistically remove some parts of the lattice, so they aren't bonded to their neighbours
-    rand_mat = np.random.choice([True, False], (N, N), p = [flip_prob, 1-flip_prob])
+    # Probabilistically remove some parts of the lattice, so they aren't bonded to their neighbours
+    rand_mat = np.random.choice([True, False], (n, n), p=[flip_prob, 1 - flip_prob])
     masked_mat = np.where(rand_mat, state, 0)
 
-    #Find the clusters in the masked matrix
+    # Find the clusters in the masked matrix
     cluster_mat = find_clusters_periodic(masked_mat)
 
-    #For each cluster generate a boolean that dictates whether that cluster should be flipped
+    # For each cluster generate a boolean that dictates whether that cluster should be flipped
     max_cluster_index = np.amax(cluster_mat)
     flip_vec = np.random.choice([True, False], max_cluster_index + 1)
 
-    #The 0 positions should be left unflipped
+    # The 0 positions should be left unflipped
     flip_vec[0] = False
 
     return np.where(flip_vec[cluster_mat], -state, state)
-"""
