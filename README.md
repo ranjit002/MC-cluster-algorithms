@@ -1,4 +1,4 @@
-# MC-cluster-algorithms
+# Monte Carlo Cluster Algorithms
 Efficient implementation of Monte Carlo Cluster Algorithms in Python.
 In ising.py the Metropolis, Wolff and Swedsen-Wang (SW) algorithms are implemented.
 
